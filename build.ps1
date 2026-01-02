@@ -23,6 +23,10 @@ $zipPath = "dist\ControllerTray.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 Compress-Archive -Path $distDir -DestinationPath $zipPath
 
+$rootZip = "ControllerTray.zip"
+if (Test-Path $rootZip) { Remove-Item -Force $rootZip }
+Move-Item $zipPath $rootZip
+
 Write-Host "Done! Package created at: $zipPath" -ForegroundColor Green
 Write-Host "Contents:" -ForegroundColor Yellow
 Get-ChildItem -Recurse $distDir | ForEach-Object { Write-Host "  $($_.FullName.Replace((Get-Location).Path + '\dist\', ''))" }
