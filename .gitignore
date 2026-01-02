@@ -1,3 +1,1 @@
-target/debug/*
-target/*
-!target/debug/controller_app.exe
+target/
