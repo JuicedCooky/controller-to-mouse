@@ -22,7 +22,7 @@ Originally created for the Lenovo Legion Go, where one or both controllers can b
 
 ## Installation
 
-1. Download `ControllerTray.zip` from the releases
+1. Download `ControllerTray.zip` from the releases ([Download ControllerTray](ControllerTray.zip))
 2. Extract the zip to a folder of your choice
 3. Run `ControllerTray.exe`
 
