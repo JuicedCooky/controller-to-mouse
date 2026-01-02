@@ -20,6 +20,9 @@ Originally created for the Lenovo Legion Go, where one or both controllers can b
 - **System tray integration** - Runs quietly in the background
 - **Persistent settings** - Configuration saved to `config.toml`
 
+### Specific Use Case:
+Allows Legion Go controllers to work when detached from device (both or single controller detached).
+
 ## Installation
 
 1. Download `ControllerTray.zip` from the releases
