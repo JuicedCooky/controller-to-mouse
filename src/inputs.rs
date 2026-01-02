@@ -339,8 +339,8 @@ impl DirectInputContext {
 
             if result.is_ok() {
                 // Debug: print raw values
-                println!("raw: x={} y={} z={} rx={} ry={} rz={}",
-                    state.x, state.y, state.z, state.rx, state.ry, state.rz);
+                // println!("raw: x={} y={} z={} rx={} ry={} rz={}",
+                //     state.x, state.y, state.z, state.rx, state.ry, state.rz);
 
                 // Convert from DirectInput range (typically 0-65535 with center at 32767)
                 // to signed range (-32768 to 32767 with center at 0)
@@ -537,12 +537,17 @@ pub fn spawn_polling_thread(settings: Arc<Mutex<settings::Settings>>) {
                 }
             };
             
-            println!("x:{} y:{}",x,y);
+            // Swap axes if enabled
+            let (x, y) = if temp_settings.swap_axes { (y, x) } else { (x, y) };
 
             // Apply deadzone
-            let x = apply_deadzone(x, temp_settings.deadzone);
+            let mut x = apply_deadzone(x, temp_settings.deadzone);
             let mut y = apply_deadzone(y, temp_settings.deadzone);
 
+            // Apply inversions
+            if temp_settings.invert_x {
+                x = -x;
+            }
             if temp_settings.invert_y {
                 y = -y;
             }
@@ -554,7 +559,7 @@ pub fn spawn_polling_thread(settings: Arc<Mutex<settings::Settings>>) {
             let dx = (x * temp_settings.sensitivity * dt.as_secs_f32()) as i32;
             let dy = (y * temp_settings.sensitivity * dt.as_secs_f32()) as i32;
 
-            println!("dx:{} dy:{}",dx,dy);
+            // println!("dx:{} dy:{}",dx,dy);
 
             send_mouse_delta(dx, dy);
 

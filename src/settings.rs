@@ -54,6 +54,10 @@ impl DualStickPriority {
 pub struct Settings {
     pub enabled: bool,
     pub invert_y: bool,
+    #[serde(default)]
+    pub invert_x: bool,
+    #[serde(default)]
+    pub swap_axes: bool,
     pub sensitivity: f32,
     pub deadzone: f32,
     #[serde(default)]
@@ -67,6 +71,8 @@ impl Default for Settings {
         Self {
             enabled: true,
             invert_y: true,
+            invert_x: false,
+            swap_axes: false,
             sensitivity: 1.0,
             deadzone: 0.075,
             input_type: InputType::XInput,
@@ -137,7 +143,11 @@ pub fn run_settings_window() -> Result<()> {
                 ui.separator();
 
                 ui.checkbox(&mut self.settings.enabled, "Enabled");
-                ui.checkbox(&mut self.settings.invert_y, "Invert Y");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut self.settings.invert_x, "Invert X");
+                    ui.checkbox(&mut self.settings.invert_y, "Invert Y");
+                    ui.checkbox(&mut self.settings.swap_axes, "Swap X/Y");
+                });
 
                 ui.horizontal(|ui| {
                     ui.label("Input Type:");
@@ -164,10 +174,20 @@ pub fn run_settings_window() -> Result<()> {
                     });
                 }
 
-                ui.add(egui::Slider::new(&mut self.settings.sensitivity, 0.1..=2.0)
-                    .text("Sensitivity"));
-                ui.add(egui::Slider::new(&mut self.settings.deadzone, 0.0..=0.5)
-                    .text("Deadzone"));
+                ui.horizontal(|ui| {
+                    ui.label("Sensitivity:");
+                    ui.add_sized(
+                        [ui.available_width(), 20.0],
+                        egui::Slider::new(&mut self.settings.sensitivity, 0.01..=2.0)
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Deadzone:");
+                    ui.add_sized(
+                        [ui.available_width(), 20.0],
+                        egui::Slider::new(&mut self.settings.deadzone, 0.0..=0.5)
+                    );
+                });
 
                 ui.separator();
 
@@ -196,6 +216,8 @@ pub fn run_settings_window() -> Result<()> {
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([420.0, 330.0])
+            .with_min_inner_size([320.0, 280.0])
+            .with_resizable(true)
             .with_title("Settings"),
         ..Default::default()
     };
