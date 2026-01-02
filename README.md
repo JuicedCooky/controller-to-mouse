@@ -1,0 +1,1 @@
+maps controller joysticks to mouse movement, supports X-input and D-input devices (dual or single devices). Originally made to be compatible with Legion go controllers when one or both controllers are detached/disconnected.
