@@ -12,12 +12,54 @@ use tao::event_loop::EventLoopProxy;
 use eframe::egui;
 use crate::tray::TrayEvent;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum InputType {
+    #[default]
+    XInput,
+    DirectInputSingle,
+    DirectInputDual,
+}
+
+impl InputType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            InputType::XInput => "XInput (Xbox)",
+            InputType::DirectInputSingle => "DirectInput (Single)",
+            InputType::DirectInputDual => "DirectInput (Dual)",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DualStickPriority {
+    #[default]
+    Stick1First,
+    Stick2First,
+    LargestMagnitude,
+    CombineAdditive,
+}
+
+impl DualStickPriority {
+    pub fn label(&self) -> &'static str {
+        match self {
+            DualStickPriority::Stick1First => "Stick 1 Priority",
+            DualStickPriority::Stick2First => "Stick 2 Priority",
+            DualStickPriority::LargestMagnitude => "Largest Movement",
+            DualStickPriority::CombineAdditive => "Combine (Additive)",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub enabled: bool,
     pub invert_y: bool,
     pub sensitivity: f32,
     pub deadzone: f32,
+    #[serde(default)]
+    pub input_type: InputType,
+    #[serde(default)]
+    pub dual_stick_priority: DualStickPriority,
 }
 
 impl Default for Settings {
@@ -27,6 +69,8 @@ impl Default for Settings {
             invert_y: true,
             sensitivity: 1.0,
             deadzone: 0.075,
+            input_type: InputType::XInput,
+            dual_stick_priority: DualStickPriority::Stick1First,
         }
     }
 }
@@ -95,6 +139,31 @@ pub fn run_settings_window() -> Result<()> {
                 ui.checkbox(&mut self.settings.enabled, "Enabled");
                 ui.checkbox(&mut self.settings.invert_y, "Invert Y");
 
+                ui.horizontal(|ui| {
+                    ui.label("Input Type:");
+                    egui::ComboBox::from_id_source("input_type")
+                        .selected_text(self.settings.input_type.label())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.settings.input_type, InputType::XInput, InputType::XInput.label());
+                            ui.selectable_value(&mut self.settings.input_type, InputType::DirectInputSingle, InputType::DirectInputSingle.label());
+                            ui.selectable_value(&mut self.settings.input_type, InputType::DirectInputDual, InputType::DirectInputDual.label());
+                        });
+                });
+
+                if self.settings.input_type == InputType::DirectInputDual {
+                    ui.horizontal(|ui| {
+                        ui.label("Dual Stick Priority:");
+                        egui::ComboBox::from_id_source("dual_priority")
+                            .selected_text(self.settings.dual_stick_priority.label())
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.settings.dual_stick_priority, DualStickPriority::Stick1First, DualStickPriority::Stick1First.label());
+                                ui.selectable_value(&mut self.settings.dual_stick_priority, DualStickPriority::Stick2First, DualStickPriority::Stick2First.label());
+                                ui.selectable_value(&mut self.settings.dual_stick_priority, DualStickPriority::LargestMagnitude, DualStickPriority::LargestMagnitude.label());
+                                ui.selectable_value(&mut self.settings.dual_stick_priority, DualStickPriority::CombineAdditive, DualStickPriority::CombineAdditive.label());
+                            });
+                    });
+                }
+
                 ui.add(egui::Slider::new(&mut self.settings.sensitivity, 0.1..=2.0)
                     .text("Sensitivity"));
                 ui.add(egui::Slider::new(&mut self.settings.deadzone, 0.0..=0.5)
@@ -126,7 +195,7 @@ pub fn run_settings_window() -> Result<()> {
 
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([420.0, 260.0])
+            .with_inner_size([420.0, 330.0])
             .with_title("Settings"),
         ..Default::default()
     };
