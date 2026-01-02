@@ -1,6 +1,6 @@
 use std::{
     fs, 
-    path::{Path, PathBuf},
+    path::{PathBuf},
     env,
     process::Command,
 };
@@ -174,20 +174,36 @@ pub fn run_settings_window() -> Result<()> {
                     });
                 }
 
+                let label_width = 100.0;
+                let value_width = 60.0;
+                let row_h = 20.0;
+
                 ui.horizontal(|ui| {
-                    ui.label("Sensitivity:");
-                    ui.add_sized(
-                        [ui.available_width(), 20.0],
-                        egui::Slider::new(&mut self.settings.sensitivity, 0.01..=2.0)
+                    ui.add_sized([label_width, row_h], egui::Label::new("Sensitivity:"));
+    
+                    let w = (ui.available_width() - value_width).max(80.0);
+                    ui.spacing_mut().slider_width = w;
+                    
+                    ui.add(
+                        egui::Slider::new(&mut self.settings.sensitivity, 0.01..=2.0).show_value(false),
                     );
+                
+                    ui.add_sized([value_width, row_h], egui::Label::new(format!("{:.2}", self.settings.sensitivity)));
                 });
+
                 ui.horizontal(|ui| {
-                    ui.label("Deadzone:");
-                    ui.add_sized(
-                        [ui.available_width(), 20.0],
-                        egui::Slider::new(&mut self.settings.deadzone, 0.0..=0.5)
+                    ui.add_sized([label_width, row_h], egui::Label::new("Deadzone:"));
+    
+                    let w = (ui.available_width() - value_width).max(80.0);
+                    ui.spacing_mut().slider_width = w;
+                    
+                    ui.add(
+                        egui::Slider::new(&mut self.settings.deadzone, 0.0..=0.5).show_value(false),
                     );
+                
+                    ui.add_sized([value_width, row_h], egui::Label::new(format!("{:.2}", self.settings.deadzone)));
                 });
+
 
                 ui.separator();
 
@@ -205,6 +221,7 @@ pub fn run_settings_window() -> Result<()> {
 
                     }
                 });
+                ui.label(format!("available_width: {:.1}", ui.available_width()));
 
                 if self.saved {
                     ui.label("Saved.");
@@ -215,8 +232,8 @@ pub fn run_settings_window() -> Result<()> {
 
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([420.0, 330.0])
-            .with_min_inner_size([320.0, 280.0])
+            // .with_inner_size([420.0, 330.0])
+            // .with_min_inner_size([320.0, 280.0])
             .with_resizable(true)
             .with_title("Settings"),
         ..Default::default()

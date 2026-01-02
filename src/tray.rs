@@ -4,7 +4,7 @@ use tray_icon::{
     Icon, TrayIconBuilder,
 };
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, Mutex};
 use tao::event::Event;
 
 use crate::inputs;
@@ -32,8 +32,8 @@ pub fn run_tray() -> Result<()>{
     let settings_item = MenuItem::new("Settings...", true, None);
     // let reload_item = MenuItem::new("Reload settings", true, None);
 
-    menu.append(&exit_item)?;
     menu.append(&settings_item)?;
+    menu.append(&exit_item)?;
     // menu.append(&reload_item)?;
     
     let icon = load_icon_from_png("assets/game-controller.png")?;

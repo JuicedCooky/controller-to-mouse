@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use anyhow::{Context, Result};
+use anyhow::{ Result};
 use std::{env};
 
 
