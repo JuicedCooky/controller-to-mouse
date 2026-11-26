@@ -3,6 +3,7 @@ use std::{
     path::{PathBuf},
     env,
     process::Command,
+    time::{Duration, SystemTime},
 };
 use directories::ProjectDirs;
 use anyhow::{Context, Result};
@@ -50,7 +51,7 @@ impl DualStickPriority {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     pub enabled: bool,
     pub invert_y: bool,
@@ -64,6 +65,12 @@ pub struct Settings {
     pub input_type: InputType,
     #[serde(default)]
     pub dual_stick_priority: DualStickPriority,
+    #[serde(default = "default_true")]
+    pub large_ui: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -77,6 +84,7 @@ impl Default for Settings {
             deadzone: 0.075,
             input_type: InputType::XInput,
             dual_stick_priority: DualStickPriority::Stick1First,
+            large_ui: true,
         }
     }
 }
@@ -101,7 +109,7 @@ pub fn load_settings() -> Result<Settings> {
     Ok(s)
 }
 
-fn save_settings(s: &Settings) -> Result<()> {
+pub fn save_settings(s: &Settings) -> Result<()> {
     let path = config_path()?;
     let txt = toml::to_string_pretty(s).context("Serializing config")?;
     fs::write(&path, txt).context("Writing config.toml")?;
@@ -119,30 +127,103 @@ pub fn spawn_settings_window(proxy: EventLoopProxy<TrayEvent>) -> anyhow::Result
         .spawn()
         .context("failed to spawn settings window")?;
 
+    // Reload whenever the settings window writes the config (every change is
+    // applied live), not only when it closes.
     std::thread::spawn(move || {
-        let _ = child.wait(); // blocks until settings window closes
-        let _ = proxy.send_event(TrayEvent::ReloadSettings);
+        let mut last = config_modified();
+        loop {
+            let exited = !matches!(child.try_wait(), Ok(None));
+            let now = config_modified();
+            if now != last {
+                last = now;
+                let _ = proxy.send_event(TrayEvent::ReloadSettings);
+            }
+            if exited {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
     });
     Ok(())
 }
 
+fn config_modified() -> Option<SystemTime> {
+    fs::metadata(config_path().ok()?).ok()?.modified().ok()
+}
+
+const NORMAL_WINDOW_SIZE: [f32; 2] = [460.0, 340.0];
+const LARGE_WINDOW_SIZE: [f32; 2] = [720.0, 560.0];
+
+fn window_size(large: bool) -> [f32; 2] {
+    if large { LARGE_WINDOW_SIZE } else { NORMAL_WINDOW_SIZE }
+}
+
+fn apply_ui_size(ctx: &egui::Context, large: bool) {
+    ctx.set_zoom_factor(if large { 1.5 } else { 1.0 });
+    ctx.style_mut(|style| {
+        if large {
+            style.spacing.button_padding = egui::vec2(12.0, 8.0);
+            style.spacing.item_spacing = egui::vec2(10.0, 10.0);
+            style.spacing.interact_size.y = 28.0;
+        } else {
+            let default = egui::Style::default();
+            style.spacing.button_padding = default.spacing.button_padding;
+            style.spacing.item_spacing = default.spacing.item_spacing;
+            style.spacing.interact_size = default.spacing.interact_size;
+        }
+    });
+}
+
 pub fn run_settings_window() -> Result<()> {
-    let mut settings = load_settings().unwrap_or_default();
-    
+    let settings = load_settings().unwrap_or_default();
+
     struct App {
         settings: Settings,
-        saved: bool,
+        // Settings when the window opened; restored on Cancel.
+        original: Settings,
+        // Last value written to disk, to save only when something changed.
+        last_saved: Settings,
+        confirmed: bool,
+        // UI size currently applied to the window (None until first frame).
+        shown_large: Option<bool>,
+    }
+
+    impl App {
+        fn revert(&mut self) {
+            self.settings = self.original.clone();
+            if self.last_saved != self.original {
+                let _ = save_settings(&self.original);
+                self.last_saved = self.original.clone();
+            }
+        }
     }
 
     impl eframe::App for App {
-        fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
+        fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
             use eframe::egui;
+
+            // Closing the window with the title-bar X counts as Cancel.
+            if ctx.input(|i| i.viewport().close_requested()) && !self.confirmed {
+                self.revert();
+            }
+
+            if self.shown_large != Some(self.settings.large_ui) {
+                apply_ui_size(ctx, self.settings.large_ui);
+                if self.shown_large.is_some() {
+                    let [w, h] = window_size(self.settings.large_ui);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(w, h)));
+                }
+                self.shown_large = Some(self.settings.large_ui);
+            }
 
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.heading("Controller Tray Settings");
                 ui.separator();
 
-                ui.checkbox(&mut self.settings.enabled, "Enabled");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut self.settings.enabled, "Enabled");
+                    ui.checkbox(&mut self.settings.large_ui, "Large (touch) UI");
+                });
                 ui.horizontal(|ui| {
                     ui.checkbox(&mut self.settings.invert_x, "Invert X");
                     ui.checkbox(&mut self.settings.invert_y, "Invert Y");
@@ -208,32 +289,32 @@ pub fn run_settings_window() -> Result<()> {
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    if ui.button("Save").clicked() {
-                        let _ = save_settings(&self.settings);
-                        self.saved = true;
-                    }
-                    if ui.button("Save & Close").clicked() {
-                        let _ = save_settings(&self.settings);
+                    if ui.button("Confirm").clicked() {
+                        self.confirmed = true;
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
-                    if ui.button("Close (No Save)").clicked() {
+                    if ui.button("Cancel").clicked() {
+                        self.revert();
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-
+                    }
+                    // Same as Cancel, but keeps the window open.
+                    if ui.button("Reset").clicked() {
+                        self.revert();
                     }
                 });
-                ui.label(format!("available_width: {:.1}", ui.available_width()));
-
-                if self.saved {
-                    ui.label("Saved.");
-                }
             });
+
+            // Apply changes live: write the config whenever a value changed.
+            if self.settings != self.last_saved && !ctx.input(|i| i.viewport().close_requested()) {
+                let _ = save_settings(&self.settings);
+                self.last_saved = self.settings.clone();
+            }
         }
     }
 
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            // .with_inner_size([420.0, 330.0])
-            // .with_min_inner_size([320.0, 280.0])
+            .with_inner_size(window_size(settings.large_ui))
             .with_resizable(true)
             .with_title("Settings"),
         ..Default::default()
@@ -242,7 +323,15 @@ pub fn run_settings_window() -> Result<()> {
     eframe::run_native(
         "Settings",
         opts,
-        Box::new(|_cc| Box::new(App { settings, saved: false })),
+        Box::new(|_cc| {
+            Box::new(App {
+                original: settings.clone(),
+                last_saved: settings.clone(),
+                settings,
+                confirmed: false,
+                shown_large: None,
+            })
+        }),
     )
     .map_err(|e| anyhow::anyhow!("eframe error: {e}"))?;
 

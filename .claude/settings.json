@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cargo build --release 2>&1)",
+      "PowerShell(cargo build --release 2>&1 | Select-Object -Last 2; $p = Start-Process -FilePath \"A:\\\\dev\\\\controller-to-mouse\\\\target\\\\release\\\\controller_app.exe\" -WorkingDirectory \"C:\\\\Windows\\\\Temp\" -PassThru; Start-Sleep 3; $p.Refresh\\(\\); \"exited=$\\($p.HasExited\\)\"; if\\(-not $p.HasExited\\){Stop-Process $p -Force})",
+      "PowerShell(Get-Process controller_app -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

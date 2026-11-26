@@ -8,6 +8,7 @@ use std::{env};
 mod tray;
 mod settings;
 mod inputs;
+mod touch_menu;
 
 
 
